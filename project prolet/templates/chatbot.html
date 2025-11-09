@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Chatbot - Prolet{% endblock %}
+{% block content %}
+<div class="tone-selector">
+  <label><input type="radio" name="tone" value="auto" checked> Auto</label>
+  <label><input type="radio" name="tone" value="formal"> Formal</label>
+  <label><input type="radio" name="tone" value="informal"> Informal</label>
+</div>
+
+<div class="chat-input">
+  <input type="text" id="userInput" placeholder="Describe your letter needs..." />
+  <button onclick="generateLetter()">Generate Letter</button>
+</div>
+
+<div id="letterOutput">
+  <div class="letter-container">
+    <div id="letterContent">Your letter will appear here...</div>
+  </div>
+  <div id="letterActions">
+  <button id="copyBtn" onclick="copyLetter()" title="Copy to clipboard">
+    📋
+  </button>
+  <button id="printBtn" onclick="window.print()" title="Print letter">
+    🖨️
+  </button>
+</div>
+</div>
+
+<script>
+  function copyLetter() {
+  const letterContent = document.getElementById('letterContent');
+  if (!letterContent) return;
+
+  // Get the text content (plain text, no HTML)
+  const text = letterContent.textContent;
+
+  navigator.clipboard.writeText(text).then(() => {
+    // Optional: Show success message
+    const btn = document.getElementById('copyBtn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = "✅ Copied!";
+    setTimeout(() => {
+      btn.innerHTML = "📋";
+    }, 2000);
+  }).catch(err => {
+    alert("Failed to copy. Please try again.");
+  });
+}
+async function generateLetter() {
+  const input = document.getElementById('userInput');
+  const letterDiv = document.getElementById('letterOutput');
+  const letterContent = document.getElementById('letterContent');
+  const printBtn = document.getElementById('letterActions');
+  
+  const msg = input.value.trim();
+  if (!msg) {
+    alert("Please describe your letter needs.");
+    return;
+  }
+
+  const tone = document.querySelector('input[name="tone"]:checked').value;
+
+  // Show loading
+  letterContent.textContent = "Generating your letter...";
+  letterDiv.style.display = "block";
+  printBtn.style.display = "none";
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, tone: tone })
+    });
+
+    const data = await res.json();
+    
+    if (data.reply) {
+      letterContent.textContent = data.reply;
+      printBtn.style.display = "block";
+    } else {
+      letterContent.textContent = "Sorry, I couldn't generate a letter. Please try again.";
+    }
+  } catch (err) {
+    letterContent.textContent = "Connection error. Please try again.";
+  }
+}
+</script>
+{% endblock %}
