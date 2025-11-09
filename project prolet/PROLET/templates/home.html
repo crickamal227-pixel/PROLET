@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Home - Prolet{% endblock %}
+{% block content %}
+<div class="hero">
+  <h1>Professional Letter Assistant</h1>
+  <p>Write, edit, and perfect your professional letters with AI-powered guidance.<br>
+     From cover letters to resignation notices — Prolet has you covered.</p>
+  <a href="{{ url_for('chatbot') }}" class="btn">Start Writing Now</a>
+</div>
+
+<div class="features">
+  <div class="feature-card">
+    <div class="feature-icon">✉️</div>
+    <h3>Letter Templates</h3>
+    <p>Choose from dozens of professionally crafted templates for any occasion.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon">✍️</div>
+    <h3>Smart Editing</h3>
+    <p>Get real-time suggestions to improve tone, clarity, and professionalism.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon">🤖</div>
+    <h3>AI Chat Support</h3>
+    <p>Ask our AI assistant anything about letter writing — it’s like having a pro editor on-demand.</p>
+  </div>
+</div>
+{% endblock %}

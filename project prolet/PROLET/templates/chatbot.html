@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}Chatbot - Prolet{% endblock %}
+{% block content %}
+<div class="tone-selector">
+  <label><input type="radio" name="tone" value="auto" checked> Auto</label>
+  <label><input type="radio" name="tone" value="formal"> Formal</label>
+  <label><input type="radio" name="tone" value="informal"> Informal</label>
+</div>
+
+<div class="chat-input">
+  <input type="text" id="userInput" placeholder="Describe your letter needs..." />
+  <button onclick="generateLetter()">Generate Letter</button>
+</div>
+
+<div id="letterOutput">
+  <div id="printableLetter" style="display: none; padding: 40px; width: 210mm; font-family: 'Georgia', serif; line-height: 1.6; font-size: 12pt; color: #000;">
+  <pre id="printableContent"></pre>
+</div>
+  <div class="letter-container">
+    <div id="letterContent">Your letter will appear here...</div>
+  </div>
+  <!-- Email input and send button -->
+<div id="emailSection" style="text-align: center; margin: 1rem 0; display: none;">
+  <input type="email" id="emailInput" placeholder="Enter recipient email" 
+         style="padding: 8px; width: 250px; margin-right: 8px; border: 1px solid #ccc; border-radius: 4px;">
+  <button onclick="sendEmail()" 
+          style="padding: 8px 12px; background: #4a6fa5; color: white; border: none; border-radius: 4px; cursor: pointer;">
+    📧 Send Email
+  </button>
+</div>
+ <div id="letterActions">
+  <button id="copyBtn" onclick="copyLetter()" title="Copy to clipboard">📋</button>
+  <button onclick="downloadPDF()" title="Download as PDF">📄</button>
+  <button id="printBtn" onclick="window.print()" title="Print letter">🖨️</button>
+</div>
+</div>
+
+<script>
+  async function downloadPDF() {
+  // Get the letter text
+  const letterText = document.getElementById('letterContent').textContent;
+  if (!letterText || letterText.trim() === "Your letter will appear here..." || letterText.includes("Generating")) {
+    alert("Please generate a letter first.");
+    return;
+  }
+
+  // Create a hidden printable div (A4 size with margins)
+  const printableDiv = document.createElement('div');
+  printableDiv.style.cssText = `
+    position: fixed;
+    top: -9999px;
+    left: -9999px;
+    width: 210mm;
+    padding: 40px;
+    font-family: 'Georgia', serif;
+    font-size: 12pt;
+    line-height: 1.6;
+    color: #000;
+    background: white;
+  `;
+  printableDiv.innerHTML = `<pre>${letterText}</pre>`;
+  document.body.appendChild(printableDiv);
+
+  try {
+    // Capture as image
+    const canvas = await html2canvas(printableDiv, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff'
+    });
+
+    // Create PDF
+    const { jsPDF } = window.jspdf;
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const imgWidth = 210;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+
+    // Download
+    pdf.save('prolet_letter.pdf');
+  } catch (err) {
+    console.error("PDF Error:", err);
+    alert("Failed to generate PDF. Please try again.");
+  } finally {
+    // Clean up
+    document.body.removeChild(printableDiv);
+  }
+}
+async function generateLetter() {
+  const input = document.getElementById('userInput');
+  const letterDiv = document.getElementById('letterOutput');
+  const letterContent = document.getElementById('letterContent');
+  const printBtn = document.getElementById('letterActions');
+  
+  const msg = input.value.trim();
+  if (!msg) {
+    alert("Please describe your letter needs.");
+    return;
+  }
+
+  const tone = document.querySelector('input[name="tone"]:checked').value;
+
+  // Show loading
+  letterContent.textContent = "Generating your letter...";
+  letterDiv.style.display = "block";
+  printBtn.style.display = "none";
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, tone: tone })
+    });
+
+    const data = await res.json();
+    
+    if (data.reply) {
+      letterContent.textContent = data.reply;
+      printBtn.style.display = "block";
+      document.getElementById('emailSection').style.display = "block";
+    } else {
+      letterContent.textContent = "Sorry, I couldn't generate a letter. Please try again.";
+    }
+  } catch (err) {
+    letterContent.textContent = "Connection error. Please try again.";
+  }
+}
+async function sendEmail() {
+  // 1. Get the email address the user typed
+  const email = document.getElementById('emailInput').value.trim();
+  
+  // 2. Get the letter text that was generated
+  const letter = document.getElementById('letterContent').textContent;
+
+  // 3. Make sure both are filled
+  if (!email) {
+    alert("Please enter a recipient email.");
+    return;
+  }
+  if (!letter || letter.includes("Your letter will appear") || letter.includes("Generating")) {
+    alert("Please generate a letter first.");
+    return;
+  }
+
+  // 4. Send the data to your Flask backend
+  try {
+    const response = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: email, letter: letter })
+    });
+
+    // 5. Read the response
+    const data = await response.json();
+
+    // 6. Show result to user
+    if (data.success) {
+      alert("✅ Email sent successfully!");
+    } else {
+      alert("❌ " + (data.error || "Failed to send email."));
+    }
+  } catch (error) {
+    // 7. Handle network errors
+    console.error("Email error:", error);
+    alert("Failed to connect to server. Please try again.");
+  }
+}
+function copyLetter() {
+  // 1. Find the element that contains the letter
+  const letterElement = document.getElementById('letterContent');
+  
+  // 2. If the element doesn't exist, show error
+  if (!letterElement) {
+    alert("❌ Error: Letter not found!");
+    return;
+  }
+
+  // 3. Get the text content (plain text, no HTML)
+  const text = letterElement.textContent;
+
+  // 4. Don't copy placeholder text
+  if (
+    !text ||
+    text.trim() === "" ||
+    text.includes("Your letter will appear") ||
+    text === "..." ||
+    text.includes("Generating")
+  ) {
+    alert("⚠️ Please generate a letter first!");
+    return;
+  }
+
+  // 5. Copy to clipboard
+  navigator.clipboard.writeText(text)
+    .then(() => {
+      // 6. Show success feedback
+      const btn = document.getElementById('copyBtn');
+      if (btn) {
+        btn.innerHTML = "✅";
+        setTimeout(() => {
+          btn.innerHTML = "📋";
+        }, 1500);
+      }
+    })
+    .catch(err => {
+      // 7. Handle errors (e.g. browser permissions)
+      alert("❌ Failed to copy. Try Ctrl+C instead.");
+      console.error("Copy failed:", err);
+    });
+}
+</script>
+{% endblock %}
